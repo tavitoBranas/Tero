@@ -1,0 +1,2 @@
+# Tero
+Obligatorio Proyecto DevOps
