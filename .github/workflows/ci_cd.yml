@@ -23,13 +23,13 @@ jobs:
 
       # analisis de codigo y envio de su resultado a SOnarQube
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # corresponde a la version 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       # espera el procesamiento de los resultados y su comprobacion final
       - name: SonarQube Quality Gate
-        uses: SonarSource/sonarqube-quality-gate-action@v1.2.1
+        uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # corresponde a la version 1.2.1
         with:
           pollingTimeoutSec: 600
         env:
