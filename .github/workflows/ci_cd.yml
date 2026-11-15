@@ -11,7 +11,7 @@ on:
 concurrency:
   group: tero-cicd-main
   cancel-in-progress: false
-  
+
 jobs:
   sonarqube:
     name: Test SonarQube
@@ -47,7 +47,10 @@ jobs:
             --data-urlencode "metricKeys=new_code_smells")
 
           COUNT=$(echo "$RESPONSE" | jq -er \
-            '.component.measures[] | select(.metric == "new_code_smells") | .value | tonumber')
+            '.component.measures[]
+              | select(.metric == "new_code_smells")
+              | .periods[0].value
+          | tonumber')
 
           echo "Nuevos Code Smells: $COUNT"
 
