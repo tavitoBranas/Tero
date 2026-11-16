@@ -1,0 +1,10 @@
+name: Tero Terraform
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pendiente:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Terraform pendiente"
