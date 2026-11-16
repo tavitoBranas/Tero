@@ -1,14 +1,16 @@
 name: Tero CICD
 
+#no va a existir un push directo a main, siempre ira por PR
 #ejecusion del pipeline solo cuando se aprueba el PR
 #se agrega capacidad de ejecusion manual
+
 on:
   pull_request:
   #se ejecuta cuando se crea un PR, cuando se suben commits a la rama PR o cuando se reabre un PR
     branches: [main]
     types: [opened, synchronize, reopened] 
-  push:
-    branches: [main]
+  
+  
   workflow_dispatch:
 
 # Evita ejecuciones simultaneas del pipeline
