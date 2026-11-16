@@ -23,6 +23,13 @@ jobs:
     name: Test SonarQube
     runs-on: ubuntu-latest
     steps:
+
+      - name: Prueba de bloqueo de merge
+        run: |
+          echo "::error::Fallo intencional para probar el ruleset"
+          exit 1
+
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -75,7 +82,7 @@ jobs:
           echo "Nuevos Code Smells: $COUNT"
 
           ############# -------->> se evalua contra el limite de 5 establecido en la documentacion
-          if [ "$COUNT" -gt 0 ]; then
+          if [ "$COUNT" -gt 5 ]; then
             echo "::error::Se superó el máximo de 5 nuevos Code Smells"
             exit 1
           fi
