@@ -3,13 +3,17 @@ name: Tero CICD
 #ejecusion del pipeline solo cuando se aprueba el PR
 #se agrega capacidad de ejecusion manual
 on:
+  pull_request:
+  #se ejecuta cuando se crea un PR, cuando se suben commits a la rama PR o cuando se reabre un PR
+    branches: [main]
+    types: [opened, synchronize, reopened] 
   push:
     branches: [main]
   workflow_dispatch:
 
 # Evita ejecuciones simultaneas del pipeline
 concurrency:
-  group: tero-cicd-main
+  group: tero-cicd-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -39,24 +43,37 @@ jobs:
       - name: Validar nuevos Code Smells
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          PARAMS=(
+            --data-urlencode "component=tavitoBranas_Tero"
+            --data-urlencode "metricKeys=new_code_smells"
+          )
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "Validando Code Smells del PR #$PR_NUMBER"
+            PARAMS+=(--data-urlencode "pullRequest=$PR_NUMBER")
+          else
+            echo "Validando Code Smells de main"
+            PARAMS+=(--data-urlencode "branch=main")
+          fi
+
           RESPONSE=$(curl --fail --silent --show-error \
             --user "$SONAR_TOKEN:" \
             --get "https://sonarcloud.io/api/measures/component" \
-            --data-urlencode "component=tavitoBranas_Tero" \
-            --data-urlencode "metricKeys=new_code_smells")
+            "${PARAMS[@]}")
 
           COUNT=$(echo "$RESPONSE" | jq -er \
             '.component.measures[]
-              | select(.metric == "new_code_smells")
-              | .periods[0].value
-          | tonumber')
+             | select(.metric == "new_code_smells")
+             | .periods[0].value
+             | tonumber')
 
           echo "Nuevos Code Smells: $COUNT"
 
           ############# -------->> se evalua contra el limite de 5 establecido en la documentacion
-
-          if [ "$COUNT" -gt 5 ]; then          
+          if [ "$COUNT" -gt 5 ]; then
             echo "::error::Se superó el máximo de 5 nuevos Code Smells"
             exit 1
           fi
