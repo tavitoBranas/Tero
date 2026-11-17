@@ -95,3 +95,74 @@ jobs:
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e #corresponde al SHA de la 3er version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  #gGitHub actions lo genera automaticamente
+  
+  trivy_filesystem:
+    name: Trivy - Filesystem
+    runs-on: ubuntu-latest
+    needs: gitleaks
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v6
+
+      - name: Escaneo Trivy Filesystem
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 #v0.36.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          scanners: 'vuln'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: false
+          format: 'json'
+          output: 'trivy-fs.json'
+          exit-code: '0'
+
+      - name: Quality Gate - trivy_filesystem #permite que el pipeline solo falle si existen vulnerabilidades HIGH o CRITICAL sin parche
+        run: |
+          jq -e '
+            [.Results[]?.Vulnerabilities[]?
+             | select(
+                 (.Severity == "CRITICAL" or .Severity == "HIGH")
+                 and (.FixedVersion == null or .FixedVersion == "")
+               )
+            ] | length == 0
+          ' trivy-fs.json
+
+  trivy_image:
+    name: Trivy - Image
+    runs-on: ubuntu-latest
+    needs: trivy_filesystem
+
+    steps:
+      #provisoriamente se crea la imagen para testeo
+
+      - name: Contruccion de la imagen para testeo de Trivy
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 #v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: lab-github-actions:${{ github.sha }}
+
+      - name: Escaneo 
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 #v0.36.0
+        with:
+          scan-type: 'image'
+          image-ref: 'lab-github-actions:${{ github.sha }}'
+          scanners: 'vuln'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: false
+          format: 'json'
+          output: 'trivy-image.json'
+          exit-code: '0'
+
+      - name: Quality Gate - trivy_image #permite que el pipeline solo falle si existen vulnerabilidades HIGH o CRITICAL sin parche
+        run: |
+          jq -e '
+            [.Results[]?.Vulnerabilities[]?
+             | select(
+                 (.Severity == "CRITICAL" or .Severity == "HIGH")
+                 and (.FixedVersion == null or .FixedVersion == "")
+               )
+            ] | length == 0
+          ' trivy-image.json
