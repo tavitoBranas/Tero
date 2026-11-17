@@ -119,6 +119,17 @@ jobs:
 
       - name: Quality Gate - trivy_filesystem
         run: |
+          echo "Vulnerabilidades HIGH o CRITICAL sin parche informado:"
+
+          jq -r '
+            .Results[]?.Vulnerabilities[]?
+            | select(
+                (.Severity == "CRITICAL" or .Severity == "HIGH")
+                and (.FixedVersion == null or .FixedVersion == "")
+              )
+            | "\(.VulnerabilityID) | Paquete: \(.PkgName) | Severidad: \(.Severity) | Version: \(.InstalledVersion)"
+          ' trivy-fs.json
+
           jq -e '
             [.Results[]?.Vulnerabilities[]?
              | select(
