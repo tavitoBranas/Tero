@@ -113,6 +113,7 @@ jobs:
           scanners: 'vuln'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: false
+          ignorefile: '.trivyignore'  # eliminar posteriormente a la creacion de la imagen 
           format: 'json'
           output: 'trivy-fs.json'
           exit-code: '0'

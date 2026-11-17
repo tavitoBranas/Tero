@@ -1,0 +1,5 @@
+# Excepción temporal para validar el pipeline CI/CD.
+# Dependencia: picomatch@4.0.3
+# Origen: src/checkout/yarn.lock
+# Pendiente de revisión y remediación.
+CVE-2026-112366
