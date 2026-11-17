@@ -9,8 +9,6 @@ on:
   #se ejecuta cuando se crea un PR, cuando se suben commits a la rama PR o cuando se reabre un PR
     branches: [main]
     types: [opened, synchronize, reopened] 
-  
-  
   workflow_dispatch:
 
 # Evita ejecuciones simultaneas del pipeline
@@ -81,3 +79,19 @@ jobs:
           fi
 
           echo "Control de Code Smells superado"
+
+  gitleaks:
+    name: Escaneo por Gitleaks
+    runs-on: ubuntu-latest
+    needs: sonarqube
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Ejecutar Gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e #corresponde al SHA de la 3er version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  #gGitHub actions lo genera automaticamente
