@@ -91,6 +91,6 @@ jobs:
           fetch-depth: 0
 
       - name: Ejecutar Gitleaks
-        uses: gitleaks/gitleaks-action@v3
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e #corresponde al SHA de la 3er version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  #gGitHub actions lo genera automaticamente
