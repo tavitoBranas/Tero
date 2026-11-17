@@ -177,11 +177,22 @@ jobs:
 
       - name: Quality Gate - trivy_image
         run: |
-            jq -e '
-            [.Results[]?.Vulnerabilities[]?
+          echo "Vulnerabilidades HIGH o CRITICAL sin parche informado:"
+
+          jq -r '
+            .Results[]?.Vulnerabilities[]?
             | select(
+                (.Severity == "CRITICAL" or .Severity == "HIGH")
+                and (.FixedVersion == null or .FixedVersion == "")
+              )
+            | "\(.VulnerabilityID) | Paquete: \(.PkgName) | Severidad: \(.Severity) | Version: \(.InstalledVersion)"
+          ' trivy-image.json
+
+          jq -e '
+            [.Results[]?.Vulnerabilities[]?
+             | select(
                  (.Severity == "CRITICAL" or .Severity == "HIGH")
                  and (.FixedVersion == null or .FixedVersion == "")
                )
             ] | length == 0
-            ' trivy-image.json
+          ' trivy-image.json
