@@ -167,8 +167,8 @@ jobs:
         service:
           - admin
           - cart
-          # - catalog
-          # - checkout
+          - catalog
+          - checkout
           # - orders
           # - ui
 
