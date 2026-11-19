@@ -1,0 +1,22 @@
+# Control de versiones
+.git
+.gitignore
+
+# Archivos de documentación
+*.md
+
+# Archivos temporales
+*.log
+*.tmp
+
+# Ejecutables generados
+orders
+catalog
+
+# Archivos sensibles
+.env
+.env.*
+
+# Archivos de Docker
+Dockerfile
+.dockerignore

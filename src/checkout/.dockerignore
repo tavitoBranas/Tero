@@ -1,0 +1,26 @@
+# Dependencias locales
+node_modules/
+
+# Archivos compilados
+dist/
+build/
+
+# Resultados de pruebas
+coverage/
+
+# Control de versiones
+.git
+.gitignore
+
+# Archivos temporales
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Archivos sensibles
+.env
+.env.*
+
+# Archivos de Docker
+Dockerfile
+.dockerignore

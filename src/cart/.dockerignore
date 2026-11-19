@@ -1,0 +1,27 @@
+# Entornos virtuales
+.venv/
+venv/
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Caché de pruebas
+.pytest_cache/
+
+# Control de versiones
+.git
+.gitignore
+
+# Archivos temporales
+*.log
+*.tmp
+
+# Archivos sensibles
+.env
+.env.*
+
+# Archivos de Docker
+Dockerfile
+.dockerignore
