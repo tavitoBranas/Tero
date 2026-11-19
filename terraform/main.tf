@@ -1,5 +1,5 @@
 terraform {
-  required_version = "= 1.50"
+  required_version = "= 1.14.0"
 
   required_providers {
     aws = {
@@ -9,10 +9,10 @@ terraform {
   }
 
   backend "s3" {
-    bucket  = "tero-tf.state"
-    key     = "tero/terraform.tfstate"
-    region  = "us-east-1"
-    encrypt = true
+    bucket       = "tero-tf.state"
+    key          = "tero/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
     use_lockfile = true #habilita el bloqueo del state para evitar que dos ejecuciones de Terraform intenten modificarlo a la vez
   }
 }
