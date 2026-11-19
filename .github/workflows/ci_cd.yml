@@ -166,7 +166,7 @@ jobs:
       matrix:
         service:
           - admin
-          # - cart
+          - cart
           # - catalog
           # - checkout
           # - orders
@@ -206,40 +206,40 @@ jobs:
 
           echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
-      # - name: Escaneo Trivy Image
-      #   uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
-      #   with:
-      #     scan-type: 'image'
-      #     image-ref: ${{ steps.build.outputs.image_uri }}
-      #     scanners: 'vuln'
-      #     severity: 'CRITICAL,HIGH'
-      #     ignore-unfixed: false
-      #     ignorefile: '.trivyignore'
-      #     format: 'json'
-      #     output: 'trivy-image.json'
-      #     exit-code: '0'
+      - name: Escaneo Trivy Image
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: 'image'
+          image-ref: ${{ steps.build.outputs.image_uri }}
+          scanners: 'vuln'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: false
+          ignorefile: '.trivyignore'
+          format: 'json'
+          output: 'trivy-image.json'
+          exit-code: '0'
 
-      # - name: Quality Gate - trivy_image
-      #   run: |
-      #     echo "Vulnerabilidades HIGH o CRITICAL sin parche informado:"
+      - name: Quality Gate - trivy_image
+        run: |
+          echo "Vulnerabilidades HIGH o CRITICAL sin parche informado:"
 
-      #     jq -r '
-      #       .Results[]?.Vulnerabilities[]?
-      #       | select(
-      #           (.Severity == "CRITICAL" or .Severity == "HIGH")
-      #           and (.FixedVersion == null or .FixedVersion == "")
-      #         )
-      #       | "\(.VulnerabilityID) | Paquete: \(.PkgName) | Severidad: \(.Severity) | Version: \(.InstalledVersion)"
-      #     ' trivy-image.json
+          jq -r '
+            .Results[]?.Vulnerabilities[]?
+            | select(
+                (.Severity == "CRITICAL" or .Severity == "HIGH")
+                and (.FixedVersion == null or .FixedVersion == "")
+              )
+            | "\(.VulnerabilityID) | Paquete: \(.PkgName) | Severidad: \(.Severity) | Version: \(.InstalledVersion)"
+          ' trivy-image.json
 
-      #     jq -e '
-      #       [.Results[]?.Vulnerabilities[]?
-      #       | select(
-      #           (.Severity == "CRITICAL" or .Severity == "HIGH")
-      #           and (.FixedVersion == null or .FixedVersion == "")
-      #         )
-      #       ] | length == 0
-      #     ' trivy-image.json
+          jq -e '
+            [.Results[]?.Vulnerabilities[]?
+            | select(
+                (.Severity == "CRITICAL" or .Severity == "HIGH")
+                and (.FixedVersion == null or .FixedVersion == "")
+              )
+            ] | length == 0
+          ' trivy-image.json
 
       # - name: Push image to ECR
       #   run: docker push "${{ steps.build.outputs.image_uri }}"
