@@ -165,12 +165,12 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - admin
-          - cart
-          - catalog
+          #- admin
+          #- cart
+          #- catalog
           - checkout
-          # - orders
-          # - ui
+          - orders
+          - ui
 
     steps:
       - name: Checkout code

@@ -3,23 +3,32 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+RUN corepack enable
+
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn/releases/ ./.yarn/releases/
+
+RUN yarn install --immutable
 
 COPY . .
+
 RUN yarn build
+
 
 # ETAPA 2: RUNTIME
 FROM node:22-alpine
 
 WORKDIR /app
 
+RUN corepack enable
+
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/yarn.lock ./
+COPY --from=builder /app/.yarnrc.yml ./
+COPY --from=builder /app/.yarn/releases/ ./.yarn/releases/
 
-RUN yarn install --frozen-lockfile --production \
-    && yarn cache clean
+RUN yarn workspaces focus --production
 
 USER nobody
 
