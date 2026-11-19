@@ -154,7 +154,7 @@ jobs:
   #         ' trivy-fs.json
 
   # ──────────────────────────────────────────────
-  # JOB 4: Build
+  # JOB 4: Build, Trivy image y push al ECR
   # ──────────────────────────────────────────────
 
   build-and-push:
@@ -168,8 +168,8 @@ jobs:
           #- admin
           #- cart
           #- catalog
-          - checkout
-          - orders
+          #- checkout
+          #- orders
           - ui
 
     steps:
@@ -241,8 +241,8 @@ jobs:
             ] | length == 0
           ' trivy-image.json
 
-      # - name: Push image to ECR
-      #   run: docker push "${{ steps.build.outputs.image_uri }}"
+      - name: Push image to ECR
+        run: docker push "${{ steps.build.outputs.image_uri }}"
 
   # ──────────────────────────────────────────────
   # JOB 5: Trivy image
