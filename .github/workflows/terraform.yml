@@ -1,10 +1,129 @@
+
 name: Tero Terraform
 
 on:
+  # Validaciones antes del merge
+  pull_request:
+    branches: ["main"]
+    paths:
+      - 'infra/**'
+      - 'modules/**'
+      - '.github/workflows/terraform.yml'
+
+  # Se ejecuta después de un merge a main
+  push:
+    branches: ["main"]
+
+  # Ejecución manual
   workflow_dispatch:
 
+# permissions:
+#   contents: read
+#   pull-requests: write
+
+# concurrency:
+#   group: tero-terraform
+#   cancel-in-progress: false
+
 jobs:
-  pendiente:
+  terraform:
+    name: Terraform
     runs-on: ubuntu-latest
+
     steps:
-      - run: echo "Terraform pendiente"
+      - name: Placeholder Terraform
+        run: echo "Terraform pendiente de implementar"
+        
+#   terraform:
+#     name: Terraform CI/CD
+#     runs-on: ubuntu-latest
+
+#     env:
+#       TF_IN_AUTOMATION: true
+#       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#       AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+#       AWS_REGION: us-east-1
+
+#     defaults:
+#       run:
+#         working-directory: ./infra
+
+#     steps:
+#       # 1. Obtener el repositorio
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       # 2. Instalar Terraform
+#       - name: Setup Terraform
+#         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+#         with:
+#           terraform_version: 1.14.0
+#           terraform_wrapper: true
+
+#       # 3. Comprobar formato de Terraform
+#       - name: Terraform Format
+#         run: terraform fmt -check -recursive ..
+
+#       # 4. Inicializar Terraform y conectar con S3
+#       - name: Terraform Init
+#         run: terraform init -input=false
+
+#       # 5. Validar los archivos Terraform
+#       - name: Terraform Validate
+#         run: terraform validate
+
+#       # 6. Generar plan
+#       - name: Terraform Plan
+#         id: plan
+#         run: terraform plan -input=false -no-color -out=tfplan
+#         continue-on-error: true
+
+#       # 7. Publicar resultado en el Pull Request
+#       - name: Comment Terraform Plan
+#         if: github.event_name == 'pull_request'
+#         uses: actions/github-script@v7
+#         env:
+#           PLAN: ${{ steps.plan.outputs.stdout }}
+#           PLAN_ERROR: ${{ steps.plan.outputs.stderr }}
+#           PLAN_STATUS: ${{ steps.plan.outcome }}
+#         with:
+#           script: |
+#             const result = process.env.PLAN_STATUS === 'success'
+#               ? process.env.PLAN
+#               : process.env.PLAN_ERROR;
+
+#             const output = `### Terraform Plan - Tero
+
+#             Estado: ${process.env.PLAN_STATUS}
+
+#             <details>
+#             <summary>Ver resultado del plan</summary>
+
+#             \`\`\`terraform
+#             ${result.slice(0, 55000)}
+#             \`\`\`
+
+#             </details>
+
+#             Autor: @${context.actor}`;
+
+#             await github.rest.issues.createComment({
+#               issue_number: context.issue.number,
+#               owner: context.repo.owner,
+#               repo: context.repo.repo,
+#               body: output
+#             });
+
+#       # 8. Bloquear pipeline si falla Terraform Plan
+#       - name: Terraform Plan Status
+#         if: steps.plan.outcome == 'failure'
+#         run: exit 1
+
+#       # 9. Aplicar infraestructura después del merge
+#       - name: Terraform Apply
+#         if: >
+#           github.event_name == 'push' ||
+#           (github.event_name == 'workflow_dispatch' &&
+#            github.ref == 'refs/heads/main')
+#         run: terraform apply -input=false -auto-approve tfplan
