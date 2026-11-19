@@ -9,6 +9,12 @@ on:
   #se ejecuta cuando se crea un PR, cuando se suben commits a la rama PR o cuando se reabre un PR
     branches: [main]
     types: [opened, synchronize, reopened] 
+
+  workflow_run:
+    workflows: ["Tero Terraform"]
+    types: [completed]
+    branches: [main]
+
   workflow_dispatch:
 
 # Evita ejecuciones simultaneas del pipeline
@@ -158,6 +164,12 @@ jobs:
   # ──────────────────────────────────────────────
 
   build-and-push:
+
+    if: >
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+
     name: Build & Push de imagen - ${{ matrix.service }}
     runs-on: ubuntu-latest
 
@@ -173,8 +185,12 @@ jobs:
           - ui
 
     steps:
+
+      # consytruye el mismo codigo commit que activo terraform
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@4fc4975a852c8cd99761e2de1f4ba73402e44dd9 #v4.0.3
@@ -192,14 +208,14 @@ jobs:
         id: build
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
           SERVICE: ${{ matrix.service }}
         run: |
           IMAGE_URI="$REGISTRY/tero-$SERVICE:$IMAGE_TAG"
 
           docker build \
-            --label "git.sha=${{ github.sha }}" \
-            --label "git.branch=${{ github.ref_name }}" \
+            --label "git.sha=${{ github.event.workflow_run.head_sha }}" \
+            --label "git.branch=${{ github.event.workflow_run.head_branch }}" \
             --label "build.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             -t "$IMAGE_URI" \
             "./src/$SERVICE"
@@ -243,64 +259,3 @@ jobs:
 
       - name: Push image to ECR
         run: docker push "${{ steps.build.outputs.image_uri }}"
-
-  # ──────────────────────────────────────────────
-  # JOB 5: Trivy image
-  # ──────────────────────────────────────────────
-
-#   trivy_image:
-#     name: Analisis de Trivy modo imagen
-#     runs-on: ubuntu-latest
-#     #needs: trivy_filesystem
-  
-#     steps:
-#       - name: Checkout del repositorio
-#         uses: actions/checkout@v6
-
-# ###############################################################################
-#         # provisoriamente se construye la imagen par testeo de trivy. Esto debera considerarse en la construccion del contenedor
-
-#       - name: Build imagen (sin push)
-#         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 #v5
-#         with:
-#           context: ./src/checkout   
-#           push: false # no carga la imagen a un repo
-#           load: true # mantiene la imagen dentro del runner para disponibilizarla para el prox step
-#           tags: lab-github-actions:${{ github.sha }}
-
-# ###############################################################################
-
-#       - name: Escaneo Trivy Image
-#         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
-#         with:
-#           scan-type: 'image'
-#           image-ref: 'lab-github-actions:${{ github.sha }}'
-#           scanners: 'vuln'
-#           severity: 'CRITICAL,HIGH'
-#           ignore-unfixed: false
-#           ignorefile: '.trivyignore'  # eliminar posteriormente a la creacion de la imagen 
-#           format: 'json'
-#           output: 'trivy-image.json'
-#           exit-code: '0'
-
-#       - name: Quality Gate - trivy_image
-#         run: |
-#           echo "Vulnerabilidades HIGH o CRITICAL sin parche informado:"
-
-#           jq -r '
-#             .Results[]?.Vulnerabilities[]?
-#             | select(
-#                 (.Severity == "CRITICAL" or .Severity == "HIGH")
-#                 and (.FixedVersion == null or .FixedVersion == "")
-#               )
-#             | "\(.VulnerabilityID) | Paquete: \(.PkgName) | Severidad: \(.Severity) | Version: \(.InstalledVersion)"
-#           ' trivy-image.json
-
-#           jq -e '
-#             [.Results[]?.Vulnerabilities[]?
-#              | select(
-#                  (.Severity == "CRITICAL" or .Severity == "HIGH")
-#                  and (.FixedVersion == null or .FixedVersion == "")
-#                )
-#             ] | length == 0
-#           ' trivy-image.json
