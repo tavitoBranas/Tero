@@ -22,6 +22,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar evento de Terraform
+        run: |
+          echo "Evento CI/CD: ${{ github.event_name }}"
+          echo "Resultado Terraform: ${{ github.event.workflow_run.conclusion }}"
+          echo "Evento original Terraform: ${{ github.event.workflow_run.event }}"
+
 
   # ──────────────────────────────────────────────
   # JOB 1: Sonarqube
