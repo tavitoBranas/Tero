@@ -9,10 +9,6 @@ on:
   # Permite ejecución manual
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: write
-
 # Evita ejecuciones simultáneas sobre el mismo state
 concurrency:
   group: tero-terraform
