@@ -1,27 +1,29 @@
 name: Tero Terraform
 
 on:
-  # Validaciones del Pull Request antes del merge
+  # Se ejecuta al crear o actualizar un Pull Request
   pull_request:
-      branches: [main]
-      types: [opened, synchronize, reopened]
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
-  # Se dispara automáticamente al hacer merge a main
-  push:
-    branches: ["main"]
-
-  # Permite ejecutar manualmente el workflow
+  # Permite ejecución manual
   workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: write
 
+# Evita ejecuciones simultáneas sobre el mismo state
 concurrency:
   group: tero-terraform
   cancel-in-progress: false
 
 jobs:
+
+  # ──────────────────────────────────────────────
+  # JOB 1: Terraform
+  # ──────────────────────────────────────────────
+
   terraform:
     name: Terraform CI/CD
     runs-on: ubuntu-latest
@@ -38,6 +40,7 @@ jobs:
         working-directory: ./terraform
 
     steps:
+
       # 1. Obtener el repositorio
       - name: Checkout code
         uses: actions/checkout@v4
@@ -53,7 +56,7 @@ jobs:
       - name: Terraform Format
         run: terraform fmt -check -recursive .
 
-      # 4. Inicializar Terraform y el backend S3
+      # 4. Inicializar Terraform y backend S3
       - name: Terraform Init
         run: terraform init -input=false
 
@@ -65,21 +68,19 @@ jobs:
       - name: Terraform Plan
         id: plan
         run: |
+          STATUS=0
+
           terraform plan -input=false -no-color -out=tfplan \
-            > plan.txt 2>&1
-          STATUS=$?
+            > plan.txt 2>&1 || STATUS=$?
+
           cat plan.txt
-          exit $STATUS
+          exit "$STATUS"
         continue-on-error: true
 
       # 7. Publicar resultado del plan en el PR
       - name: Comment Terraform Plan
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
-        env:
-          PLAN: ${{ steps.plan.outputs.stdout }}
-          PLAN_ERROR: ${{ steps.plan.outputs.stderr }}
-          PLAN_STATUS: ${{ steps.plan.outcome }}
         with:
           script: |
             const fs = require('fs');
@@ -118,9 +119,20 @@ jobs:
         if: steps.plan.outcome == 'failure'
         run: exit 1
 
-      # 9. Aplicar infraestructura durante el Pull Request
+      # 9. Aplicar infraestructura
       - name: Terraform Apply
         if: >
           github.event_name == 'pull_request' ||
           github.event_name == 'workflow_dispatch'
         run: terraform apply -input=false -auto-approve tfplan
+
+  # ──────────────────────────────────────────────
+  # JOB 2: Ejecutar CI/CD después de Terraform
+  # ──────────────────────────────────────────────
+
+  cicd:
+    name: Tero CI/CD
+    needs: terraform
+    if: success()
+    uses: ./.github/workflows/ci_cd.yml
+    secrets: inherit
