@@ -13,7 +13,6 @@ on:
   workflow_run:
     workflows: ["Tero Terraform"]
     types: [completed]
-    branches: [main]
 
   workflow_dispatch:
 
@@ -164,11 +163,10 @@ jobs:
   # ──────────────────────────────────────────────
 
   build-and-push:
-
     if: >
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push'
+      github.event.workflow_run.event == 'pull_request'
 
     name: Build & Push de imagen - ${{ matrix.service }}
     runs-on: ubuntu-latest

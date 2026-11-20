@@ -7,7 +7,9 @@ on:
     paths:
       - 'terraform/**'
       - 'modules/**'
+      - 'src/**/Dockerfile'
       - '.github/workflows/terraform.yml'
+      - '.github/workflows/ci_cd.yml'
 
   # Se dispara automáticamente al hacer merge a main
   push:
@@ -121,11 +123,9 @@ jobs:
         if: steps.plan.outcome == 'failure'
         run: exit 1
 
-      # 9. Aplicar infraestructura solo después del merge a main
-      # o de una ejecución manual desde main
+      # 9. Aplicar infraestructura durante el Pull Request
       - name: Terraform Apply
         if: >
-          github.event_name == 'push' ||
-          (github.event_name == 'workflow_dispatch' &&
-           github.ref == 'refs/heads/main')
+          github.event_name == 'pull_request' ||
+          github.event_name == 'workflow_dispatch'
         run: terraform apply -input=false -auto-approve tfplan
