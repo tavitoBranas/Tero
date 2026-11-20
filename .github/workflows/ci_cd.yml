@@ -15,154 +15,145 @@ on:
 
 # Evita ejecuciones simultaneas del pipeline
 concurrency:
-  group: tero-cicd-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: tero-cicd-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  debug:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verificar evento de Terraform
-        run: |
-          echo "Evento CI/CD: ${{ github.event_name }}"
-          echo "Resultado Terraform: ${{ github.event.workflow_run.conclusion }}"
-          echo "Evento original Terraform: ${{ github.event.workflow_run.event }}"
-
 
   # ──────────────────────────────────────────────
   # JOB 1: Sonarqube
   # ──────────────────────────────────────────────
 
-  # sonarqube:
-  #   name: Test SonarQube
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0
+  sonarqube:
+    name: Test SonarQube
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  #     # analisis de codigo y envio de su resultado a SOnarQube
-  #     - name: SonarQube Scan
-  #       uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # corresponde a la version 5
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # analisis de codigo y envio de su resultado a SOnarQube
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # corresponde a la version 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  #     # espera el procesamiento de los resultados y su comprobacion final
-  #     - name: SonarQube Quality Gate
-  #       uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # corresponde a la version 1.2.1
-  #       with:
-  #         pollingTimeoutSec: 600
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # espera el procesamiento de los resultados y su comprobacion final
+      - name: SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # corresponde a la version 1.2.1
+        with:
+          pollingTimeoutSec: 600
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  #       # consulta a la API y valida que los codesmells sean <= 5
-  #     - name: Validar nuevos Code Smells
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  #         EVENT_NAME: ${{ github.event_name }}
-  #         PR_NUMBER: ${{ github.event.pull_request.number }}
-  #       run: |
-  #         PARAMS=(
-  #           --data-urlencode "component=tavitoBranas_Tero"
-  #           --data-urlencode "metricKeys=new_code_smells"
-  #         )
+        # consulta a la API y valida que los codesmells sean <= 5
+      - name: Validar nuevos Code Smells
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          PARAMS=(
+            --data-urlencode "component=tavitoBranas_Tero"
+            --data-urlencode "metricKeys=new_code_smells"
+          )
 
-  #         if [ "$EVENT_NAME" = "pull_request" ]; then
-  #           echo "Validando Code Smells del PR #$PR_NUMBER"
-  #           PARAMS+=(--data-urlencode "pullRequest=$PR_NUMBER")
-  #         else
-  #           echo "Validando Code Smells de main"
-  #           PARAMS+=(--data-urlencode "branch=main")
-  #         fi
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "Validando Code Smells del PR #$PR_NUMBER"
+            PARAMS+=(--data-urlencode "pullRequest=$PR_NUMBER")
+          else
+            echo "Validando Code Smells de main"
+            PARAMS+=(--data-urlencode "branch=main")
+          fi
 
-  #         RESPONSE=$(curl --fail --silent --show-error \
-  #           --user "$SONAR_TOKEN:" \
-  #           --get "https://sonarcloud.io/api/measures/component" \
-  #           "${PARAMS[@]}")
+          RESPONSE=$(curl --fail --silent --show-error \
+            --user "$SONAR_TOKEN:" \
+            --get "https://sonarcloud.io/api/measures/component" \
+            "${PARAMS[@]}")
 
-  #         COUNT=$(echo "$RESPONSE" | jq -er \
-  #           '.component.measures[]
-  #            | select(.metric == "new_code_smells")
-  #            | .periods[0].value
-  #            | tonumber')
+          COUNT=$(echo "$RESPONSE" | jq -er \
+            '.component.measures[]
+             | select(.metric == "new_code_smells")
+             | .periods[0].value
+             | tonumber')
 
-  #         echo "Nuevos Code Smells: $COUNT"
+          echo "Nuevos Code Smells: $COUNT"
 
-  #         ############# -------->> se evalua contra el limite de 5 establecido en la documentacion
-  #         if [ "$COUNT" -gt 5 ]; then
-  #           echo "::error::Se superó el máximo de 5 nuevos Code Smells"
-  #           exit 1
-  #         fi
+          ############# -------->> se evalua contra el limite de 5 establecido en la documentacion
+          if [ "$COUNT" -gt 5 ]; then
+            echo "::error::Se superó el máximo de 5 nuevos Code Smells"
+            exit 1
+          fi
 
-  #         echo "Control de Code Smells superado"
+          echo "Control de Code Smells superado"
 
   # ──────────────────────────────────────────────
   # JOB 2: Gitleaks
   # ──────────────────────────────────────────────
 
-  # gitleaks:
-  #   name: Escaneo por Gitleaks
-  #   runs-on: ubuntu-latest
-  #   needs: sonarqube
+  gitleaks:
+    name: Escaneo por Gitleaks
+    runs-on: ubuntu-latest
+    needs: sonarqube
 
-  #   steps:
-  #     - name: Checkout del repositorio
-  #       uses: actions/checkout@v6
-  #       with:
-  #         fetch-depth: 0
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-  #     - name: Ejecutar Gitleaks
-  #       uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e #corresponde al SHA de la 3er version
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  #gGitHub actions lo genera automaticamente
+      - name: Ejecutar Gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e #corresponde al SHA de la 3er version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  #gGitHub actions lo genera automaticamente
 
   # ──────────────────────────────────────────────
   # JOB 3: Trivy filesystem
   # ──────────────────────────────────────────────
 
-  # trivy_filesystem:
-  #   name: Analisis de Trivy modo Filesystem
-  #   runs-on: ubuntu-latest
-  #   #needs: gitleaks
+  trivy_filesystem:
+    name: Analisis de Trivy modo Filesystem
+    runs-on: ubuntu-latest
+    needs: gitleaks
 
-  #   steps:
-  #     - name: Checkout del repositorio
-  #       uses: actions/checkout@v6
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v6
 
-  #     - name: Escaneo Trivy Filesystem
-  #       uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 #v0.36.0
-  #       with:
-  #         scan-type: 'fs'
-  #         scan-ref: '.'
-  #         scanners: 'vuln'
-  #         severity: 'CRITICAL,HIGH'
-  #         ignore-unfixed: false
-  #         ignorefile: '.trivyignore'  # eliminar posteriormente a la creacion de la imagen 
-  #         format: 'json'
-  #         output: 'trivy-fs.json'
-  #         exit-code: '0'
+      - name: Escaneo Trivy Filesystem
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 #v0.36.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          scanners: 'vuln'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: false
+          ignorefile: '.trivyignore'  # eliminar posteriormente a la creacion de la imagen 
+          format: 'json'
+          output: 'trivy-fs.json'
+          exit-code: '0'
 
-  #     - name: Quality Gate - trivy_filesystem
-  #       run: |
-  #         echo "Vulnerabilidades HIGH o CRITICAL sin parche informado:"
+      - name: Quality Gate - trivy_filesystem
+        run: |
+          echo "Vulnerabilidades HIGH o CRITICAL sin parche informado:"
 
-  #         jq -r '
-  #           .Results[]?.Vulnerabilities[]?
-  #           | select(
-  #               (.Severity == "CRITICAL" or .Severity == "HIGH")
-  #               and (.FixedVersion == null or .FixedVersion == "")
-  #             )
-  #           | "\(.VulnerabilityID) | Paquete: \(.PkgName) | Severidad: \(.Severity) | Version: \(.InstalledVersion)"
-  #         ' trivy-fs.json
+          jq -r '
+            .Results[]?.Vulnerabilities[]?
+            | select(
+                (.Severity == "CRITICAL" or .Severity == "HIGH")
+                and (.FixedVersion == null or .FixedVersion == "")
+              )
+            | "\(.VulnerabilityID) | Paquete: \(.PkgName) | Severidad: \(.Severity) | Version: \(.InstalledVersion)"
+          ' trivy-fs.json
 
-  #         jq -e '
-  #           [.Results[]?.Vulnerabilities[]?
-  #            | select(
-  #                (.Severity == "CRITICAL" or .Severity == "HIGH")
-  #                and (.FixedVersion == null or .FixedVersion == "")
-  #              )
-  #           ] | length == 0
-  #         ' trivy-fs.json
+          jq -e '
+            [.Results[]?.Vulnerabilities[]?
+             | select(
+                 (.Severity == "CRITICAL" or .Severity == "HIGH")
+                 and (.FixedVersion == null or .FixedVersion == "")
+               )
+            ] | length == 0
+          ' trivy-fs.json
 
   # ──────────────────────────────────────────────
   # JOB 4: Build, Trivy image y push al ECR
@@ -176,16 +167,17 @@ jobs:
 
     name: Build & Push de imagen - ${{ matrix.service }}
     runs-on: ubuntu-latest
+    needs: trivy_filesystem
 
     strategy:
       fail-fast: false
       matrix:
         service:
-          #- admin
-          #- cart
-          #- catalog
-          #- checkout
-          #- orders
+          - admin
+          - cart
+          - catalog
+          - checkout
+          - orders
           - ui
 
     steps:
