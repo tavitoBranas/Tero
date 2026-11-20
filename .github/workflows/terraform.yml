@@ -28,6 +28,11 @@ jobs:
     name: Terraform CI/CD
     runs-on: ubuntu-latest
 
+    # Permisos necesarios para leer el repositorio y comentar el PR
+    permissions:
+      contents: read
+      pull-requests: write
+
     env:
       TF_IN_AUTOMATION: true
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
