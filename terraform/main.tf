@@ -10,7 +10,7 @@ terraform {
 
   backend "s3" {
     bucket       = "tero-tf.state"
-    key          = "tero/terraform.tfstate"
+    key          = "terraform.tfstate"
     region       = "us-east-1"
     encrypt      = true
     use_lockfile = true #habilita el bloqueo del state para evitar que dos ejecuciones de Terraform intenten modificarlo a la vez
