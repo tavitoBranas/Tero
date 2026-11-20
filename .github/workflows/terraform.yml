@@ -3,13 +3,8 @@ name: Tero Terraform
 on:
   # Validaciones del Pull Request antes del merge
   pull_request:
-    branches: ["main"]
-    paths:
-      - 'terraform/**'
-      - 'modules/**'
-      - 'src/**/Dockerfile'
-      - '.github/workflows/terraform.yml'
-      - '.github/workflows/ci_cd.yml'
+      branches: [main]
+      types: [opened, synchronize, reopened]
 
   # Se dispara automáticamente al hacer merge a main
   push:

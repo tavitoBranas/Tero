@@ -5,15 +5,12 @@ name: Tero CICD
 #se agrega capacidad de ejecusion manual
 
 on:
-  pull_request:
-  #se ejecuta cuando se crea un PR, cuando se suben commits a la rama PR o cuando se reabre un PR
-    branches: [main]
-    types: [opened, synchronize, reopened] 
-
+  # Se ejecuta cuando termina el pipeline Terraform
   workflow_run:
     workflows: ["Tero Terraform"]
     types: [completed]
 
+  # Permite ejecución manual
   workflow_dispatch:
 
 # Evita ejecuciones simultaneas del pipeline
