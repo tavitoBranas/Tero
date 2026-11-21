@@ -134,6 +134,5 @@ jobs:
   cicd:
     name: Tero CI/CD
     needs: terraform
-    if: success()
     uses: ./.github/workflows/ci_cd.yml
     secrets: inherit
