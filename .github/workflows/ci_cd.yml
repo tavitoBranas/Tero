@@ -6,7 +6,10 @@ name: Tero CICD
 on:
   # Se ejecuta cuando termina el pipeline Terraform
   # Se utiliza workflow_call para ejecutar la version del CI/CD incluida en el PR
-  workflow_call:
+
+######### DESCOMENTAR ESTO 
+
+  # workflow_call:
 
   # Permite ejecución manual
   workflow_dispatch:
@@ -29,7 +32,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-      
+
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
