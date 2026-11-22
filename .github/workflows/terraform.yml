@@ -131,11 +131,13 @@ jobs:
   # JOB 2: Ejecutar CI/CD después de Terraform
   # ──────────────────────────────────────────────
 
-  cicd:
-    name: Tero CI/CD
-    needs: terraform
-    permissions:
-      contents: read
-      pull-requests: read
-    uses: ./.github/workflows/ci_cd.yml
-    secrets: inherit
+######### DESCOMENTAR ESTO
+
+  # cicd:
+  #   name: Tero CI/CD
+  #   needs: terraform
+  #   permissions:
+  #     contents: read
+  #     pull-requests: read
+  #   uses: ./.github/workflows/ci_cd.yml
+  #   secrets: inherit
