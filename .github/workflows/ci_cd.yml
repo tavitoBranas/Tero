@@ -11,10 +11,6 @@ on:
   # Permite ejecución manual
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: read
-
 # Evita ejecuciones simultaneas del pipeline
 concurrency:
   group: tero-cicd-${{ github.workflow }}-${{ github.ref }}
@@ -29,6 +25,11 @@ jobs:
   sonarqube:
     name: Test SonarQube
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: read
+      
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
