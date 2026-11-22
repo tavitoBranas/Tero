@@ -4,12 +4,12 @@ name: Destroy
 
 # Borra la app y toda la infraestructura. Se ejecuta solo a mano:
 # Actions → Destroy → Run workflow → escribir "destroy".
-# on:
-#   workflow_dispatch:
-#     inputs:
-#       confirm:
-#         description: 'Escribir "destroy" para confirmar'
-#         required: true
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Escribir "destroy" para confirmar'
+        required: true
 
 # permissions:
 #   contents: read
@@ -22,11 +22,11 @@ name: Destroy
 #   AWS_REGION: us-east-1
 #   K8S_NAMESPACE: web-app
 
-# jobs:
-#   destroy:
-#     name: Terraform destroy
-#     runs-on: ubuntu-latest
-#     if: inputs.confirm == 'destroy'
+jobs:
+   destroy:
+     name: Terraform destroy
+     runs-on: ubuntu-latest
+     if: inputs.confirm == 'destroy'
 
 #     defaults:
 #       run:
