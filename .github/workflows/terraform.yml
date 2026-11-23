@@ -5,6 +5,11 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
+  
+   # Se ejecuta al integrar cambios en main 
+   # (Después del merge a main, Terraform ejecuta el plan y el apply.)
+  push:
+    branches: [main]
 
   # Permite ejecución manual
   workflow_dispatch:
@@ -50,7 +55,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
-          terraform_version: 1.14.0
+          terraform_version: 1.17.1
           terraform_wrapper: true
 
       # 3. Comprobar formato
@@ -71,8 +76,9 @@ jobs:
         run: |
           STATUS=0
 
-          terraform plan -input=false -no-color -out=tfplan \
-            > plan.txt 2>&1 || STATUS=$?
+          terraform plan -input=false -no-color \
+            -var-file="dev.tfvars" \
+            -out=tfplan > plan.txt 2>&1 || STATUS=$?
 
           cat plan.txt
           exit "$STATUS"
@@ -121,11 +127,14 @@ jobs:
         run: exit 1
 
       # 9. Aplicar infraestructura
+
+# 9. Aplicar infraestructura
       - name: Terraform Apply
         if: >
-          github.event_name == 'pull_request' ||
+          github.event_name == 'push' ||
           github.event_name == 'workflow_dispatch'
         run: terraform apply -input=false -auto-approve tfplan
+
 
   # ──────────────────────────────────────────────
   # JOB 2: Ejecutar CI/CD después de Terraform

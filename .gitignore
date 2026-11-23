@@ -1,2 +1,9 @@
 node_modules/
 **/.yarn/install-state.gz
+
+# Terraform
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/tfplan
+**/plan.txt
