@@ -6,6 +6,17 @@ terraform {
       source  = "hashicorp/aws"
       version = "= 6.0.0"
     }
+
+    helm = {
+      source  = "hashicorp/helm"
+      version = "= 3.1.0"
+    }
+
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "= 2.38.0"
+    }
+
   }
 
   backend "s3" {
@@ -20,6 +31,47 @@ terraform {
 # Provider AWS
 provider "aws" {
   region = "us-east-1"
+}
+
+# Conexion de Helm con el cluster EKS
+provider "helm" {
+  kubernetes = {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_ca_certificate)
+
+    exec = {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args = [
+        "eks",
+        "get-token",
+        "--cluster-name",
+        module.eks.cluster_name,
+        "--region",
+        "us-east-1"
+      ]
+    }
+  }
+}
+
+# Conexion del provider Kubernetes con EKS
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_ca_certificate)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+
+    args = [
+      "eks",
+      "get-token",
+      "--cluster-name",
+      module.eks.cluster_name,
+      "--region",
+      "us-east-1"
+    ]
+  }
 }
 
 # Repositorios ECR para los microservicios
@@ -76,7 +128,7 @@ module "eks" {
 
   node_group_name = "tero-node-group"
 
-  #se setean los valores de las instancias según ambientes 
+  #se setean los valores de las instancias según ambientes
   instance_types    = var.node_instance_types
   node_desired_size = var.node_desired_size
   node_min_size     = var.node_min_size
@@ -88,3 +140,25 @@ data "aws_iam_role" "labrole" {
   name = "LabRole"
 }
 
+# Instalación del AWS Load Balancer Controller en EKS
+module "alb_controller" {
+  source       = "./modules/alb_controller"
+  cluster_name = module.eks.cluster_name
+  aws_region   = "us-east-1"
+  vpc_id       = module.networking.vpc_id
+
+  depends_on = [module.eks]
+}
+
+# Namespaces Kubernetes para los ambientes de Tero
+module "namespaces" {
+  source = "./modules/namespaces"
+
+  namespaces = [
+    "dev",
+    "test",
+    "prod"
+  ]
+
+  depends_on = [module.eks]
+}

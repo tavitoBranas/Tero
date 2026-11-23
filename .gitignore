@@ -3,7 +3,27 @@ node_modules/
 
 # Terraform
 **/.terraform/
-**/*.tfstate
-**/*.tfstate.*
+*.tfstate
+*.tfstate.*
+*.tfplan
 **/tfplan
-**/plan.txt
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.tfstate.lock.info
+
+# Credenciales y archivos sensibles
+.env
+.env.*
+*.pem
+*.key
+
+# Sistema y editor
+.DS_Store
+Thumbs.db
+.vscode/*.log
