@@ -17,6 +17,11 @@ variable "public_subnets" {
   type        = list(string)
 }
 
+variable "private_subnets" {
+  description = "CIDR de las subredes privadas"
+  type        = list(string)
+}
+
 variable "cluster_name" {
   description = "Nombre del cluster EKS"
   type        = string

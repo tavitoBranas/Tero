@@ -11,3 +11,8 @@ output "public_subnet_ids" {
   description = "Ids de la subnets publicas"
   value       = aws_subnet.public[*].id
 }
+
+output "private_subnet_ids" {
+  description = "IDs de las subredes privadas para EKS"
+  value       = aws_subnet.private[*].id
+}
