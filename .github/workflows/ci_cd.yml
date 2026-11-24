@@ -7,9 +7,9 @@ on:
   # Se ejecuta cuando termina el pipeline Terraform
   # Se utiliza workflow_call para ejecutar la version del CI/CD incluida en el PR
 
-######### DESCOMENTAR ESTO 
+######### DESCOMENTAR ESTO
 
-  # workflow_call:
+  workflow_call:
 
   # Permite ejecución manual
   workflow_dispatch:
@@ -84,7 +84,7 @@ jobs:
           scanners: 'vuln'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: false
-          ignorefile: '.trivyignore'
+          trivyignores: '.trivyignore'
           format: 'json'
           output: 'trivy-image.json'
           exit-code: '0'
@@ -113,3 +113,280 @@ jobs:
 
       - name: Push image to ECR
         run: docker push "${{ steps.build.outputs.image_uri }}"
+
+      - name: Obtener digest de la imagen
+        id: digest
+        env:
+          SERVICE: ${{ matrix.service }}
+          IMAGE_TAG: ${{ github.sha }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          DIGEST=$(aws ecr describe-images \
+            --repository-name "tero-$SERVICE" \
+            --image-ids imageTag="$IMAGE_TAG" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)
+
+          if [[ "$DIGEST" != sha256:* ]]; then
+            echo "::error::No se pudo obtener el digest"
+            exit 1
+          fi
+
+          IMAGE_URI="$REGISTRY/tero-$SERVICE@$DIGEST"
+
+          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+          echo "Imagen publicada: $IMAGE_URI"
+
+      - name: Guardar referencia de la imagen
+        env:
+          SERVICE: ${{ matrix.service }}
+          IMAGE_URI: ${{ steps.digest.outputs.image_uri }}
+        run: |
+          mkdir -p image-digests
+          printf '%s\n' "$IMAGE_URI" > "image-digests/$SERVICE.txt"
+
+      - name: Publicar referencia de la imagen
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: image-digest-${{ matrix.service }}
+          path: image-digests/${{ matrix.service }}.txt
+          retention-days: 1
+          if-no-files-found: error
+
+  # ──────────────────────────────────────────────
+  # JOB 2: Preparar bases de datos TEST
+  # ──────────────────────────────────────────────
+
+  prepare-test-databases:
+    name: Prepare TEST Databases
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    environment: test
+
+    env:
+      AWS_REGION: us-east-1
+      EKS_CLUSTER: tero-eks
+      NAMESPACE: ${{ vars.NAMESPACE }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@4fc4975a852c8cd99761e2de1f4ba73402e44dd9 # v4.0.3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Configure Kubernetes access
+        run: |
+          aws eks update-kubeconfig \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER"
+
+      - name: Verify namespace
+        run: kubectl get namespace "$NAMESPACE"
+
+      - name: Create PostgreSQL Secret
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          kubectl create secret generic postgres-secret \
+            --namespace "$NAMESPACE" \
+            --from-literal=POSTGRES_USER="$POSTGRES_USER" \
+            --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy TEST Databases
+        run: |
+          for FILE in k8s/database/*.yaml; do
+            envsubst '${NAMESPACE}' < "$FILE" | kubectl apply -f -
+          done
+
+      - name: Verify TEST Databases
+        run: |
+          kubectl rollout status deployment/postgres \
+            --namespace "$NAMESPACE" \
+            --timeout=300s
+
+          kubectl rollout status deployment/redis \
+            --namespace "$NAMESPACE" \
+            --timeout=300s
+
+
+  # ──────────────────────────────────────────────
+  # JOB 3: Despliegue en DEV
+  # ──────────────────────────────────────────────
+
+  deploy-dev:
+    name: Deploy DEV
+    runs-on: ubuntu-latest
+    needs: prepare-test-databases
+
+    environment: dev
+
+    env:
+      AWS_REGION: us-east-1
+      EKS_CLUSTER: tero-eks
+      NAMESPACE: ${{ vars.NAMESPACE }}
+      REPLICAS: ${{ vars.REPLICAS }}
+      DB_HOST: ${{ vars.DB_HOST }}
+      DB_ENDPOINT: ${{ vars.DB_ENDPOINT }}
+      REDIS_URL: ${{ vars.REDIS_URL }}
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@4fc4975a852c8cd99761e2de1f4ba73402e44dd9 # v4.0.3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Configure Kubernetes access
+        run: |
+          aws eks update-kubeconfig \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER"
+
+      - name: Verify namespace
+        run: kubectl get namespace "$NAMESPACE"
+
+      - name: Download image digests
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: image-digest-*
+          path: image-digests
+          merge-multiple: true
+
+      - name: Verify image digests
+        run: |
+          for SERVICE in admin cart catalog checkout orders ui; do
+            FILE="image-digests/$SERVICE.txt"
+
+            if [ ! -s "$FILE" ]; then
+              echo "::error::Referencia no encontrada para $SERVICE"
+              exit 1
+            fi
+
+            IMAGE_URI=$(cat "$FILE")
+
+            if [[ ! "$IMAGE_URI" =~ @sha256:[a-f0-9]{64}$ ]]; then
+              echo "::error::Digest inválido para $SERVICE"
+              exit 1
+            fi
+
+            echo "$SERVICE: $IMAGE_URI"
+          done
+
+      - name: Create Admin Secret
+        env:
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
+        run: |
+          kubectl create secret generic admin-secret \
+            --namespace "$NAMESPACE" \
+            --from-literal=ADMIN_USERNAME="$ADMIN_USERNAME" \
+            --from-literal=ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+            --from-literal=ADMIN_JWT_SECRET="$ADMIN_JWT_SECRET" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create PostgreSQL Secret
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          kubectl create secret generic postgres-secret \
+            --namespace "$NAMESPACE" \
+            --from-literal=POSTGRES_USER="$POSTGRES_USER" \
+            --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy DEV Services
+        run: |
+          for FILE in k8s/services/*.yaml; do
+            envsubst '${NAMESPACE}' < "$FILE" | kubectl apply -f -
+          done
+
+      - name: Deploy DEV Microservices
+        run: |
+          for SERVICE in admin cart catalog checkout orders ui; do
+
+            export IMAGE_URI=$(cat "image-digests/$SERVICE.txt")
+
+            echo "Desplegando $SERVICE"
+            echo "Imagen: $IMAGE_URI"
+
+            envsubst '${NAMESPACE} ${REPLICAS} ${IMAGE_URI} ${DB_HOST} ${DB_ENDPOINT} ${REDIS_URL}' \
+              < "k8s/deployments/$SERVICE.yaml" \
+              | kubectl apply -f -
+
+          done
+
+      - name: Verify DEV Deployments
+        run: |
+          for SERVICE in admin cart catalog checkout orders ui; do
+
+            echo "Verificando $SERVICE"
+
+            kubectl rollout status deployment/"$SERVICE" \
+              --namespace "$NAMESPACE" \
+              --timeout=300s
+
+          done
+
+  # ──────────────────────────────────────────────
+  # JOB 4: Despliegue en TEST
+  # ──────────────────────────────────────────────
+
+  # deploy-test:
+  #   name: Deploy TEST
+  #   runs-on: ubuntu-latest
+  #   needs: deploy-dev
+
+  #   environment: test
+
+  #   env:
+  #     AWS_REGION: us-east-1
+  #     EKS_CLUSTER: tero-eks
+  #     NAMESPACE: ${{ vars.NAMESPACE }}
+  #     REPLICAS: ${{ vars.REPLICAS }}
+  #     DB_HOST: ${{ vars.DB_HOST }}
+  #     DB_ENDPOINT: ${{ vars.DB_ENDPOINT }}
+  #     REDIS_URL: ${{ vars.REDIS_URL }}
+
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+  #       with:
+  #         persist-credentials: false
+
+  #     - name: Configure AWS credentials
+  #       uses: aws-actions/configure-aws-credentials@4fc4975a852c8cd99761e2de1f4ba73402e44dd9 # v4.0.3
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+  #         aws-region: us-east-1
+
+  #     - name: Configure Kubernetes access
+  #       run: |
+  #         aws eks update-kubeconfig \
+  #           --region "$AWS_REGION" \
+  #           --name "$EKS_CLUSTER"
+
+  #     - name: Verify namespace
+  #       run: kubectl get namespace "$NAMESPACE"

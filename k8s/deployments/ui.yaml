@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui
+  namespace: ${NAMESPACE}
+
+spec:
+  replicas: ${REPLICAS}
+
+  selector:
+    matchLabels:
+      app: ui
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  template:
+    metadata:
+      labels:
+        app: ui
+
+    spec:
+      containers:
+        - name: ui
+          image: ${IMAGE_URI}
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: RETAIL_UI_ENDPOINTS_CATALOG
+              value: "http://catalog:8080"
+
+            - name: RETAIL_UI_ENDPOINTS_CARTS
+              value: "http://carts:8080"
+
+            - name: RETAIL_UI_ENDPOINTS_CHECKOUT
+              value: "http://checkout:8080"
+
+            - name: RETAIL_UI_ENDPOINTS_ORDERS
+              value: "http://orders:8080"
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15

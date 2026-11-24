@@ -15,6 +15,7 @@ FROM node:22-alpine
 WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/package*.json ./
 
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force

@@ -5,8 +5,8 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
-  
-   # Se ejecuta al integrar cambios en main 
+
+   # Se ejecuta al integrar cambios en main
    # (Después del merge a main, Terraform ejecuta el plan y el apply.)
   push:
     branches: [main]
@@ -146,7 +146,7 @@ jobs:
           scanners: 'vuln'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: false
-          trivyignores: '.trivyignore'  # eliminar posteriormente a la creacion de la imagen 
+          trivyignores: '.trivyignore'  # eliminar posteriormente a la creacion de la imagen
           format: 'json'
           output: 'trivy-fs.json'
           exit-code: '0'
@@ -282,9 +282,6 @@ jobs:
 
       # 9. Aplicar infraestructura
       - name: Terraform Apply
-        if: >
-          github.event_name == 'push' ||
-          github.event_name == 'workflow_dispatch'
         run: terraform apply -input=false -auto-approve tfplan
 
 
@@ -292,13 +289,13 @@ jobs:
   # JOB 2: Ejecutar CI/CD después de Terraform
   # ──────────────────────────────────────────────
 
-######### DESCOMENTAR ESTO
+######## DESCOMENTAR ESTO
 
-  # cicd:
-  #   name: Tero CI/CD
-  #   needs: terraform
-  #   permissions:
-  #     contents: read
-  #     pull-requests: read
-  #   uses: ./.github/workflows/ci_cd.yml
-  #   secrets: inherit
+  cicd:
+    name: Tero CI/CD
+    needs: terraform
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci_cd.yml
+    secrets: inherit
