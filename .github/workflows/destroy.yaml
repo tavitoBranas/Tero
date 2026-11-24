@@ -48,32 +48,112 @@ jobs:
       - name: Terraform Init
         run: terraform init -input=false
 
-      # Eliminar únicamente infraestructura temporal.
-      # NO destruir ECR ni el backend S3.
-      - name: Terraform Destroy Plan
+      - name: Configure Kubernetes access
+        shell: bash
         run: |
-            terraform plan -destroy -input=false \
-            -var-file="dev.tfvars" \
-            -target=module.eks \
-            -target=module.networking \
-            -out=destroy.tfplan
+          aws eks update-kubeconfig \
+            --region "$AWS_REGION" \
+            --name tero-eks
 
-            terraform show -json destroy.tfplan > destroy.json
+      - name: Delete Kubernetes Ingress
+        shell: bash
+        run: |
+          for NAMESPACE in test prod; do
 
-            if jq -e '
-            [.resource_changes[]? |
-            select(
-                .type == "aws_ecr_repository" and
-                (.change.actions | index("delete"))
-            )] | length > 0
-            ' destroy.json; then
-            echo "ERROR: El plan intenta eliminar repositorios ECR."
-            exit 1
+            echo "Eliminando Ingress de $NAMESPACE"
+
+            kubectl delete ingress --all \
+              --namespace "$NAMESPACE" \
+              --ignore-not-found=true \
+              --wait=true \
+              --timeout=600s
+
+          done
+
+      - name: Verify ALB deletion
+        shell: bash
+        run: |
+          for ATTEMPT in $(seq 1 60); do
+
+            ALB_COUNT=$(aws elbv2 describe-load-balancers \
+              --region "$AWS_REGION" \
+              --query "length(LoadBalancers[?starts_with(LoadBalancerName, 'k8s-terotest-') || starts_with(LoadBalancerName, 'k8s-teroprod-')])" \
+              --output text)
+
+            if [ "$ALB_COUNT" = "0" ]; then
+              echo "Todos los ALB de Tero fueron eliminados"
+              exit 0
             fi
 
+            echo "ALB pendientes: $ALB_COUNT"
+            echo "Esperando - Intento $ATTEMPT de 60"
+            sleep 10
+
+          done
+
+          echo "::error::No se eliminaron todos los ALB de Tero"
+          exit 1
+
+      - name: Destroy Kubernetes components
+        shell: bash
+        run: |
+          terraform plan -destroy -input=false \
+            -var-file="dev.tfvars" \
+            -target=module.namespaces \
+            -target=module.alb_controller \
+            -out=destroy-k8s.tfplan
+
+          terraform apply -input=false \
+            -auto-approve destroy-k8s.tfplan
+
+      # Eliminar únicamente infraestructura temporal.
+      # NO destruir el backend S3.
+      
+      # Generar plan de destrucción completa
+      - name: Terraform Destroy Plan
+        shell: bash
+        run: |
+          terraform plan -destroy -input=false \
+            -var-file="dev.tfvars" \
+            -out=destroy.tfplan
+
+          terraform show -json destroy.tfplan > destroy.json
+
+          # Proteger el bucket S3 del state
+          if jq -e '
+            [.resource_changes[]? |
+              select(
+                .type == "aws_s3_bucket" and
+                .change.before.bucket == "tero-tf.state" and
+                (.change.actions | index("delete"))
+              )
+            ] | length > 0
+          ' destroy.json; then
+            echo "::error::El plan intenta eliminar el bucket S3 del state"
+            exit 1
+          fi
+
+      # Ejecutar la destrucción
       - name: Terraform Destroy
         run: terraform apply -input=false -auto-approve destroy.tfplan
 
+      # Verificar recursos restantes
       - name: Verify remaining resources
-        run: terraform state list
+        shell: bash
+        run: |
+          REMAINING=$(terraform state list)
+
+          if [ -n "$REMAINING" ]; then
+            echo "::error::Todavía existen recursos en el state"
+            echo "$REMAINING"
+            exit 1
+          fi
+
+          echo "Todos los recursos gestionados fueron eliminados"
+
+      # Verificar que el backend S3 sigue disponible
+      - name: Verify S3 backend
+        run: |
+          aws s3api head-bucket --bucket tero-tf.state
+          echo "Backend S3 conservado correctamente"
 

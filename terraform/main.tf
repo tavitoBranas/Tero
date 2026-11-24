@@ -88,6 +88,7 @@ resource "aws_ecr_repository" "tero" {
   name = "tero-${each.key}"
 
   image_tag_mutability = "IMMUTABLE"
+  force_delete         = true
 }
 
 # URLs de los repositorios
