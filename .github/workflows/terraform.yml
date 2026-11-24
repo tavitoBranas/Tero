@@ -156,11 +156,13 @@ jobs:
           echo "Vulnerabilidades HIGH o CRITICAL detectadas:"
 
           jq -r '
-            .Results[]?.Vulnerabilities[]?
+            .Results[]?
             | select(
-                (.Severity == "CRITICAL" or .Severity == "HIGH")
+                any(.Vulnerabilities[]?;
+                  .Severity == "HIGH" or .Severity == "CRITICAL"
+                )
               )
-            | "\(.VulnerabilityID) | Paquete: \(.PkgName) | Severidad: \(.Severity) | Version: \(.InstalledVersion)"
+            | "Archivo: \(.Target) | Tipo: \(.Type)"
           ' trivy-fs.json
 
           jq -e '
