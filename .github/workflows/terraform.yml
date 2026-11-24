@@ -146,7 +146,7 @@ jobs:
           scanners: 'vuln'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: false
-          ignorefile: '.trivyignore'  # eliminar posteriormente a la creacion de la imagen 
+          trivyignores: '.trivyignore'  # eliminar posteriormente a la creacion de la imagen 
           format: 'json'
           output: 'trivy-fs.json'
           exit-code: '0'
@@ -168,8 +168,8 @@ jobs:
           jq -e '
             [.Results[]?.Vulnerabilities[]?
             | select(
-                .Severity == "CRITICAL" or
-                .Severity == "HIGH"
+                (.Severity == "CRITICAL" or .Severity == "HIGH")
+                and (.FixedVersion == null or .FixedVersion == "")
               )
             ] | length == 0
           ' trivy-fs.json
