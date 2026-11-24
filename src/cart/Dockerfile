@@ -5,7 +5,11 @@ WORKDIR /app
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir \
+    --only-binary=:all: \
+    --require-hashes \
+    --prefix=/install \
+    -r requirements.txt
 
 # ETAPA 2: RUNTIME
 FROM python:3.12-alpine
@@ -13,7 +17,6 @@ FROM python:3.12-alpine
 WORKDIR /app
 
 COPY --from=builder /install /usr/local
-
 COPY . .
 
 ENV CART_PERSISTENCE_PROVIDER=in-memory
