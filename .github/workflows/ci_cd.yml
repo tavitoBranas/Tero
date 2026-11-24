@@ -43,7 +43,7 @@ jobs:
     steps:
       # consytruye el mismo codigo commit que activo terraform
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@4fc4975a852c8cd99761e2de1f4ba73402e44dd9 #v4.0.3
@@ -348,45 +348,201 @@ jobs:
 
           done
 
+      - name: Verify DEV Health
+        shell: bash
+        run: |
+          kubectl run "health-check-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --namespace "$NAMESPACE" \
+            --image=curlimages/curl:8.12.1 \
+            --restart=Never \
+            --rm -i \
+            --command -- sh -ec '
+              for SERVICE in admin carts catalog checkout orders ui; do
+
+                echo "Verificando health de $SERVICE"
+
+                curl --fail --silent --show-error \
+                  --connect-timeout 5 \
+                  --max-time 15 \
+                  --retry 3 \
+                  "http://$SERVICE:8080/health"
+
+                echo ""
+                echo "$SERVICE: OK"
+
+              done
+            '
   # ──────────────────────────────────────────────
   # JOB 4: Despliegue en TEST
   # ──────────────────────────────────────────────
 
-  # deploy-test:
-  #   name: Deploy TEST
-  #   runs-on: ubuntu-latest
-  #   needs: deploy-dev
+  deploy-test:
+    name: Deploy TEST
+    runs-on: ubuntu-latest
+    needs: deploy-dev
 
-  #   environment: test
+    environment: test
 
-  #   env:
-  #     AWS_REGION: us-east-1
-  #     EKS_CLUSTER: tero-eks
-  #     NAMESPACE: ${{ vars.NAMESPACE }}
-  #     REPLICAS: ${{ vars.REPLICAS }}
-  #     DB_HOST: ${{ vars.DB_HOST }}
-  #     DB_ENDPOINT: ${{ vars.DB_ENDPOINT }}
-  #     REDIS_URL: ${{ vars.REDIS_URL }}
+    env:
+      AWS_REGION: us-east-1
+      EKS_CLUSTER: tero-eks
+      NAMESPACE: ${{ vars.NAMESPACE }}
+      REPLICAS: ${{ vars.REPLICAS }}
+      DB_HOST: ${{ vars.DB_HOST }}
+      DB_ENDPOINT: ${{ vars.DB_ENDPOINT }}
+      REDIS_URL: ${{ vars.REDIS_URL }}
 
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-  #       with:
-  #         persist-credentials: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
-  #     - name: Configure AWS credentials
-  #       uses: aws-actions/configure-aws-credentials@4fc4975a852c8cd99761e2de1f4ba73402e44dd9 # v4.0.3
-  #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-  #         aws-region: us-east-1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@4fc4975a852c8cd99761e2de1f4ba73402e44dd9 # v4.0.3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
 
-  #     - name: Configure Kubernetes access
-  #       run: |
-  #         aws eks update-kubeconfig \
-  #           --region "$AWS_REGION" \
-  #           --name "$EKS_CLUSTER"
+      - name: Configure Kubernetes access
+        run: |
+          aws eks update-kubeconfig \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER"
 
-  #     - name: Verify namespace
-  #       run: kubectl get namespace "$NAMESPACE"
+      - name: Verify namespace
+        run: kubectl get namespace "$NAMESPACE"
+
+      - name: Download image digests
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: image-digest-*
+          path: image-digests
+          merge-multiple: true
+
+      - name: Verify image digests
+        run: |
+          for SERVICE in admin cart catalog checkout orders ui; do
+            FILE="image-digests/$SERVICE.txt"
+
+            if [ ! -s "$FILE" ]; then
+              echo "::error::Referencia no encontrada para $SERVICE"
+              exit 1
+            fi
+
+            IMAGE_URI=$(cat "$FILE")
+
+            if [[ ! "$IMAGE_URI" =~ @sha256:[a-f0-9]{64}$ ]]; then
+              echo "::error::Digest inválido para $SERVICE"
+              exit 1
+            fi
+
+            echo "$SERVICE: $IMAGE_URI"
+          done
+
+      - name: Create Admin Secret
+        env:
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
+        run: |
+          kubectl create secret generic admin-secret \
+            --namespace "$NAMESPACE" \
+            --from-literal=ADMIN_USERNAME="$ADMIN_USERNAME" \
+            --from-literal=ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+            --from-literal=ADMIN_JWT_SECRET="$ADMIN_JWT_SECRET" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy TEST Services
+        shell: bash
+        run: |
+          for FILE in k8s/services/*.yaml; do
+            envsubst '${NAMESPACE}' < "$FILE" | kubectl apply -f -
+          done
+
+      - name: Deploy TEST Microservices
+        shell: bash
+        run: |
+          for SERVICE in admin cart catalog checkout orders ui; do
+
+            IMAGE_URI=$(cat "image-digests/$SERVICE.txt")
+            export IMAGE_URI
+
+            echo "Desplegando $SERVICE"
+            echo "Imagen: $IMAGE_URI"
+
+            envsubst '${NAMESPACE} ${REPLICAS} ${IMAGE_URI} ${DB_HOST} ${DB_ENDPOINT} ${REDIS_URL}' \
+              < "k8s/deployments/$SERVICE.yaml" \
+              | kubectl apply -f -
+
+          done
+
+      - name: Verify TEST Deployments
+        run: |
+          for SERVICE in admin cart catalog checkout orders ui; do
+
+            echo "Verificando $SERVICE"
+
+            kubectl rollout status deployment/"$SERVICE" \
+              --namespace "$NAMESPACE" \
+              --timeout=300s
+
+          done
+
+      - name: Deploy TEST Ingress
+        shell: bash
+        run: |
+          for FILE in k8s/ingress/*.yaml; do
+            envsubst '${NAMESPACE}' < "$FILE" | kubectl apply -f -
+          done
+
+      - name: Wait for TEST ALB
+        id: alb
+        shell: bash
+        run: |
+          for ATTEMPT in $(seq 1 60); do
+
+            ALB_HOST=$(kubectl get ingress \
+              --namespace "$NAMESPACE" \
+              -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}')
+
+            if [ -n "$ALB_HOST" ]; then
+              echo "ALB disponible: $ALB_HOST"
+              echo "hostname=$ALB_HOST" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            echo "Esperando ALB - Intento $ATTEMPT de 60"
+            sleep 10
+
+          done
+
+          echo "::error::No se obtuvo la dirección del ALB"
+          exit 1
+
+      - name: Verify TEST ALB Health
+        shell: bash
+        env:
+          ALB_HOST: ${{ steps.alb.outputs.hostname }}
+        run: |
+          for PORT in 80 8081; do
+
+            echo "Verificando ALB en puerto $PORT"
+
+            curl --fail --silent --show-error \
+              --connect-timeout 5 \
+              --max-time 15 \
+              --retry 30 \
+              --retry-delay 10 \
+              --retry-all-errors \
+              "http://$ALB_HOST:$PORT/health"
+
+            echo ""
+            echo "Puerto $PORT: OK"
+
+          done
+
+          echo "UI: http://$ALB_HOST"
+          echo "Admin: http://$ALB_HOST:8081"
