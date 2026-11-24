@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders
+  namespace: ${NAMESPACE}
+
+spec:
+  replicas: ${REPLICAS}
+
+  selector:
+    matchLabels:
+      app: orders
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  template:
+    metadata:
+      labels:
+        app: orders
+
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: orders
+          image: ${IMAGE_URI}
+          resources:
+            requests:
+              ephemeral-storage: "64Mi"
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              ephemeral-storage: "256Mi"
+              cpu: "250m"
+              memory: "128Mi"
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: GIN_MODE
+              value: "release"
+
+            - name: RETAIL_ORDERS_PERSISTENCE_ENDPOINT
+              value: "${DB_ENDPOINT}"
+
+            - name: RETAIL_ORDERS_PERSISTENCE_NAME
+              value: "orders"
+
+            - name: RETAIL_ORDERS_PERSISTENCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+
+            - name: RETAIL_ORDERS_PERSISTENCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
