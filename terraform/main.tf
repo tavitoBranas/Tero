@@ -111,6 +111,11 @@ module "networking" {
     "10.0.2.0/24"
   ]
 
+  private_subnets = [
+    "10.0.3.0/24",
+    "10.0.4.0/24"
+  ]
+
   cluster_name = "tero-eks"
 }
 
@@ -124,7 +129,7 @@ module "eks" {
   cluster_role_arn = data.aws_iam_role.labrole.arn
   node_role_arn    = data.aws_iam_role.labrole.arn
 
-  subnet_ids = module.networking.public_subnet_ids #se obtienen los ids de subnets y los proporciona aqui
+  subnet_ids = module.networking.private_subnet_ids #se obtienen los ids de subnets y los proporciona aqui
 
   node_group_name = "tero-node-group"
 
