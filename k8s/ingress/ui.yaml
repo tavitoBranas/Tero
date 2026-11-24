@@ -4,13 +4,12 @@ kind: Ingress
 metadata:
   name: ui
   namespace: ${NAMESPACE}
-
-annotations:
-  alb.ingress.kubernetes.io/group.name: tero-${NAMESPACE}
-  alb.ingress.kubernetes.io/scheme: internet-facing
-  alb.ingress.kubernetes.io/target-type: ip
-  alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
-  alb.ingress.kubernetes.io/healthcheck-path: /health
+  annotations:
+    alb.ingress.kubernetes.io/group.name: tero-${NAMESPACE}
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /health
 
 spec:
   ingressClassName: alb
