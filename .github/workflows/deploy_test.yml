@@ -178,15 +178,18 @@ jobs:
           echo "UI: http://$ALB_HOST"
           echo "Admin: http://$ALB_HOST:8081"
 
-  # ──────────────────────────────────────────────
-  # JOB 2: Tero - Deploy TEST
-  # ──────────────────────────────────────────────
+#### PRUEBAS FUNCIONALES
 
-  deploy_prod:
-    name: Tero - Deploy PROD
-    needs: deploy-test
-    permissions:
-      contents: read
-      pull-requests: read
-    uses: ./.github/workflows/deploy_prod.yml
-    secrets: inherit
+
+      - name: Registrar revision validada en TEST
+        shell: bash
+        run: |
+          git rev-parse 'HEAD^{tree}' > validated-tree.txt
+
+      - name: Publicar revision validada en TEST
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: validated-tree
+          path: validated-tree.txt
+          retention-days: 30
+          if-no-files-found: error
