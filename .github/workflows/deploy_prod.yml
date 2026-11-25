@@ -1,4 +1,4 @@
-name: Tero CICD
+name: Deploy PROD
 
 on:
     push:
@@ -6,8 +6,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
-  pull-requests: read
 
 concurrency:
   group: tero-terraform
@@ -21,6 +19,11 @@ jobs:
   validate-release:
     name: Validacion de la liberacion
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
 
     outputs:
       run_id: ${{ steps.validated_run.outputs.run_id }}
@@ -210,6 +213,10 @@ jobs:
     name: Deploy PROD
     runs-on: ubuntu-latest
     needs: [validate-release, prepare-prod-databases]
+
+    permissions:
+      contents: read
+      actions: read
 
     environment: prod
 
