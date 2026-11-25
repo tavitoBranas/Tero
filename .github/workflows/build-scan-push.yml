@@ -134,7 +134,7 @@ jobs:
         with:
           name: image-digest-${{ matrix.service }}
           path: image-digests/${{ matrix.service }}.txt
-          retention-days: 1
+          retention-days: 30
           if-no-files-found: error
 
   # ──────────────────────────────────────────────
