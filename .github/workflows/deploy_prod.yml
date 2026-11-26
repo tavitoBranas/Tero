@@ -52,7 +52,7 @@ jobs:
             )] | if length == 1 then .[0].number else empty end")
 
           if [ -z "$PR_NUMBER" ]; then
-            echo "No se encontro el Pull Request asociado"
+            echo "No se encontro el Pull Request asociado" >&2
             exit 1
           fi
 
@@ -67,12 +67,10 @@ jobs:
           RUN_ID=$(gh api \
             "repos/$GITHUB_REPOSITORY/actions/workflows/qualityGates.yml/runs?event=pull_request&status=success&head_sha=$HEAD_SHA" \
             --paginate \
-            --jq ".workflow_runs[] |
-              select(any(.pull_requests[]?; .number == $PR_NUMBER)) |
-              .id" | sed -n '1p')
+            --jq '.workflow_runs[] | .id' | sed -n '1p')
 
           if [ -z "$RUN_ID" ]; then
-            echo "No se encontro una ejecucion exitosa del PR"
+            echo "No se encontro una ejecucion exitosa del PR" >&2
             exit 1
           fi
 
@@ -108,7 +106,7 @@ jobs:
           echo "Tree integrado en main: $PROD_TREE"
 
           if [ "$VALIDATED_TREE" != "$PROD_TREE" ]; then
-            echo "ERROR: El codigo integrado no coincide con el validado en TEST"
+            echo "ERROR: El codigo integrado no coincide con el validado en TEST" >&2
             exit 1
           fi
 
