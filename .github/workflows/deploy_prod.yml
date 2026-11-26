@@ -67,9 +67,7 @@ jobs:
           RUN_ID=$(gh api \
             "repos/$GITHUB_REPOSITORY/actions/workflows/qualityGates.yml/runs?event=pull_request&status=success&head_sha=$HEAD_SHA" \
             --paginate \
-            --jq ".workflow_runs[] |
-              select(any(.pull_requests[]?; .number == $PR_NUMBER)) |
-              .id" | sed -n '1p')
+            --jq '.workflow_runs[] | .id' | sed -n '1p')
 
           if [ -z "$RUN_ID" ]; then
             echo "No se encontro una ejecucion exitosa del PR"
