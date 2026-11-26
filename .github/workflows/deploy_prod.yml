@@ -52,7 +52,7 @@ jobs:
             )] | if length == 1 then .[0].number else empty end")
 
           if [ -z "$PR_NUMBER" ]; then
-            echo "No se encontro el Pull Request asociado"
+            echo "No se encontro el Pull Request asociado" >&2
             exit 1
           fi
 
@@ -70,7 +70,7 @@ jobs:
             --jq '.workflow_runs[] | .id' | sed -n '1p')
 
           if [ -z "$RUN_ID" ]; then
-            echo "No se encontro una ejecucion exitosa del PR"
+            echo "No se encontro una ejecucion exitosa del PR" >&2
             exit 1
           fi
 
@@ -106,7 +106,7 @@ jobs:
           echo "Tree integrado en main: $PROD_TREE"
 
           if [ "$VALIDATED_TREE" != "$PROD_TREE" ]; then
-            echo "ERROR: El codigo integrado no coincide con el validado en TEST"
+            echo "ERROR: El codigo integrado no coincide con el validado en TEST" >&2
             exit 1
           fi
 
